@@ -1,0 +1,177 @@
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Server;
+using System.ComponentModel;
+using PnP.Core.Auth;
+using PnP.Core.Services;
+
+const string SP_SITE_URL = "https://epmco.sharepoint.com/sites/ARCAComitesJD-UAT";
+const string SP_CLIENT_ID = "af260938-5b7c-49a4-b2af-52d519226a3e";
+const string SP_CLIENT_SECRET = "eVpBOFF+dmdqM292NnJ0QWg0RHFLdkoxMFJEM21iVDVkaEhMemNXOA==";
+const string SP_TENANT_ID = "bf1ce8b5-5d39-4bc5-ad6e-07b3e4d7d67a";
+
+var builder = Host.CreateApplicationBuilder(args);
+
+// MUY IMPORTANTE: Los logs van a stderr, NO a stdout
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole(options =>
+{
+    options.LogToStandardErrorThreshold = LogLevel.Trace;
+});
+
+builder.Services
+    .AddMcpServer()
+    .WithStdioServerTransport()
+    .WithToolsFromAssembly();
+
+builder.Services.AddPnPCoreAuthentication(
+    options =>
+    {
+        options.Credentials.Configurations.Add("SharePointOnline",
+            new PnPCoreAuthenticationCredentialConfiguration
+            {
+                SharePointOnline = new SharePointOnlineAuthenticationProviderOptions
+                {
+                    ClientId = SP_CLIENT_ID,
+                    ClientSecret = SP_CLIENT_SECRET,
+                    TenantId = SP_TENANT_ID,
+                    SiteUrl = SP_SITE_URL
+                }
+            });
+    });
+
+var host = builder.Build();
+
+using (var scope = host.Services.CreateScope())
+{
+    var herramientasUtiles = scope.ServiceProvider.GetRequiredService<HerramientasUtiles>();
+    var resultado = await herramientasUtiles.ListarElementosSharePoint("Lugar");
+    Console.WriteLine(resultado);
+}
+
+await host.RunAsync();
+
+[McpServerToolType]
+public static class HerramientasSaludo
+{
+    [McpServerTool, Description("Saluda al usuario por su nombre")]
+    public static string Saludar(string nombre)
+        => $"¡Hola {nombre}! Saludos desde el corazón de .NET!";
+}
+
+[McpServerToolType]
+public class HerramientasUtiles
+{
+    private readonly IPnPContextFactory _pnpContextFactory;
+
+    public HerramientasUtiles(IPnPContextFactory pnpContextFactory)
+    {
+        _pnpContextFactory = pnpContextFactory;
+    }
+
+    [McpServerTool, Description("Obtiene la fecha y hora actual del sistema")]
+    public static string ObtenerFechaHora()
+        => $"La fecha y hora actual es: {DateTime.Now:dddd, dd MMMM yyyy HH:mm:ss}";
+
+    [McpServerTool, Description("Calcula cuántos días faltan para una fecha específica")]
+    public static string DiasHastaFecha(
+        [Description("Fecha en formato YYYY-MM-DD")] string fecha)
+    {
+        if (DateTime.TryParse(fecha, out var fechaObjetivo))
+        {
+            var dias = (fechaObjetivo - DateTime.Today).Days;
+            if (dias < 0)
+                return $"Esa fecha ya pasó hace {Math.Abs(dias)} días.";
+            if (dias == 0)
+                return "¡Esa fecha es hoy!";
+            return $"Faltan {dias} días para el {fechaObjetivo:dd MMMM yyyy}.";
+        }
+        return "No pude entender esa fecha. Usa el formato YYYY-MM-DD, por ejemplo: 2025-12-31";
+    }
+
+    [McpServerTool, Description("Realiza operaciones matemáticas básicas")]
+    public static string Calcular(
+        [Description("Primer número")] double numero1,
+        [Description("Operación: suma, resta, multiplica, divide")] string operacion,
+        [Description("Segundo número")] double numero2)
+    {
+        var resultado = operacion.ToLower() switch
+        {
+            "suma" or "+" => numero1 + numero2,
+            "resta" or "-" => numero1 - numero2,
+            "multiplica" or "*" or "x" => numero1 * numero2,
+            "divide" or "/" when numero2 != 0 => numero1 / numero2,
+            "divide" or "/" => double.NaN,
+            _ => double.NaN
+        };
+
+        if (double.IsNaN(resultado))
+            return operacion.ToLower().Contains("div") && numero2 == 0
+                ? "Error: No se puede dividir entre cero."
+                : "Operación no reconocida. Usa: suma, resta, multiplica o divide.";
+
+        return $"El resultado de {numero1} {operacion} {numero2} = {resultado}";
+    }
+
+    [McpServerTool, Description("Genera una contraseña aleatoria segura")]
+    public static string GenerarPassword(
+        [Description("Longitud de la contraseña (mínimo 8)")] int longitud = 16)
+    {
+        if (longitud < 8) longitud = 8;
+
+        const string caracteres = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*";
+        var random = new Random();
+        var password = new string(Enumerable.Range(0, longitud)
+            .Select(_ => caracteres[random.Next(caracteres.Length)])
+            .ToArray());
+
+        return $"Tu contraseña segura es: {password}";
+    }
+
+    [McpServerTool, Description("Lista elementos de una lista de SharePoint")]
+    public async Task<string> ListarElementosSharePoint(
+        [Description("Nombre de la lista de SharePoint")] string listName)
+    {
+        try
+        {
+            await using (var context = await _pnpContextFactory.CreateAsync("SharePointOnline"))
+            {
+                var list = await context.Web.Lists.GetByTitleAsync(listName, p => p.Title, p => p.Items);
+                if (list == null)
+                {
+                    return $"La lista '{listName}' no fue encontrada.";
+                }
+
+                if (list.Items.Any())
+                {
+                    var result = $"Elementos en la lista '{listName}':\n";
+                    foreach (var item in list.Items)
+                    {
+                        result += $"- ID: {item.Id}, Título: {item["Title"]}\n";
+                    }
+                    return result;
+                }
+                else
+                {
+                    return $"La lista '{listName}' no contiene elementos.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            return $"Error al acceder a SharePoint: {ex.Message}";
+        }
+    }
+}
+
+var host = builder.Build();
+
+using (var scope = host.Services.CreateScope())
+{
+    var herramientasUtiles = scope.ServiceProvider.GetRequiredService<HerramientasUtiles>();
+    var resultado = await herramientasUtiles.ListarElementosSharePoint("Lugar");
+    Console.WriteLine(resultado);
+}
+
+await host.RunAsync();
