@@ -7,7 +7,7 @@ using Azure.Identity;
 using Microsoft.Graph;
 using System.Text.Json;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 // MUY IMPORTANTE: Los logs van a stderr, NO a stdout
 builder.Logging.ClearProviders();
@@ -18,7 +18,7 @@ builder.Logging.AddConsole(options =>
 
 builder.Services
     .AddMcpServer()
-    .WithStdioServerTransport()
+    .WithHttpTransport()
     .WithToolsFromAssembly();
 
 // Registrar GraphServiceClient
@@ -30,9 +30,10 @@ builder.Services.AddSingleton((serviceProvider) =>
 
 builder.Services.AddScoped<HerramientasUtiles>();
 
-var host = builder.Build();
+builder.WebHost.UseUrls("http://0.0.0.0:5000");
+var app = builder.Build();
 
-using (var scope = host.Services.CreateScope())
+using (var scope = app.Services.CreateScope())
 {
     // Prueba inicial - puedes comentar esto cuando uses el servidor MCP
     // var herramientasUtiles = scope.ServiceProvider.GetRequiredService<HerramientasUtiles>();
@@ -40,7 +41,8 @@ using (var scope = host.Services.CreateScope())
     // Console.WriteLine(resultado);
 }
 
-await host.RunAsync();
+app.MapMcp("/mcp");
+await app.RunAsync();
 
 public static class SharePointConfig
 {
