@@ -35,9 +35,12 @@ var host = builder.Build();
 using (var scope = host.Services.CreateScope())
 {
     // Prueba inicial - puedes comentar esto cuando uses el servidor MCP
-    // var herramientasUtiles = scope.ServiceProvider.GetRequiredService<HerramientasUtiles>();
-    // var resultado = await herramientasUtiles.ListarElementosSharePoint("Lugar");
-    // Console.WriteLine(resultado);
+    var herramientasUtiles = scope.ServiceProvider.GetRequiredService<HerramientasUtiles>();
+    
+    // Probar Saludar con Wilfredo Casallas
+    Console.WriteLine("=== Prueba de Saludar ===");
+    Console.WriteLine(HerramientasSaludo.Saludar("Wilfredo", "Casallas"));
+    Console.WriteLine();
 }
 
 await host.RunAsync();
@@ -53,9 +56,11 @@ public static class SharePointConfig
 [McpServerToolType]
 public static class HerramientasSaludo
 {
-    [McpServerTool, Description("Saluda al usuario por su nombre")]
-    public static string Saludar(string nombre)
-        => $"¡Hola {nombre}! Saludos desde el corazón de .NET!";
+    [McpServerTool, Description("Saluda al usuario por su nombre y apellido")]
+    public static string Saludar(
+        [Description("Nombre del usuario")] string nombre,
+        [Description("Apellido del usuario")] string apellido)
+        => $"¡Hola {nombre} {apellido}! Saludos desde el corazón de .NET!";
 }
 
 [McpServerToolType]
