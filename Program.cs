@@ -35,9 +35,12 @@ var host = builder.Build();
 using (var scope = host.Services.CreateScope())
 {
     // Prueba inicial - puedes comentar esto cuando uses el servidor MCP
-    // var herramientasUtiles = scope.ServiceProvider.GetRequiredService<HerramientasUtiles>();
-    // var resultado = await herramientasUtiles.ListarElementosSharePoint("Lugar");
-    // Console.WriteLine(resultado);
+    var herramientasUtiles = scope.ServiceProvider.GetRequiredService<HerramientasUtiles>();
+    
+    // Probar Saludar con Wilfredo Casallas
+    Console.WriteLine("=== Prueba de Saludar ===");
+    Console.WriteLine(HerramientasSaludo.Saludar("Wilfredo", "Casallas"));
+    Console.WriteLine();
 }
 
 await host.RunAsync();
