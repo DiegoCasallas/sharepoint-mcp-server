@@ -53,9 +53,11 @@ public static class SharePointConfig
 [McpServerToolType]
 public static class HerramientasSaludo
 {
-    [McpServerTool, Description("Saluda al usuario por su nombre")]
-    public static string Saludar(string nombre)
-        => $"¡Hola {nombre}! Saludos desde el corazón de .NET!";
+    [McpServerTool, Description("Saluda al usuario por su nombre y apellido")]
+    public static string Saludar(
+        [Description("Nombre del usuario")] string nombre,
+        [Description("Apellido del usuario")] string apellido)
+        => $"¡Hola {nombre} {apellido}! Saludos desde el corazón de .NET!";
 }
 
 [McpServerToolType]
